@@ -1,163 +1,122 @@
-use gloo::timers::callback::Interval;
-use rand::Rng;
-use yew::html::Scope;
-use yew::{classes, html, Component, Context, Html};
+use std::iter::successors;
+use std::ops::Range;
 
-pub enum Dir {
+use gloo::net::websocket::Message;
+use num_complex::Complex64;
+use yew::{html, Component};
+
+enum Dir {
     Up,
     Down,
     Left,
     Right,
 }
-pub enum Msg {
+enum Msg {
     Random,
-    Zoom,
-    Dezoom,
+    ZoomOut,
+    ZoomIn,
     Move(Dir),
 }
 
-pub struct App {
-    active: bool,
-    cells: Vec<bool>,
-    cells_width: usize,
-    _interval: Interval,
+struct App {
+    min_real: f64,
+    max_real: f64,
+    min_imag: f64,
+    max_imag: f64,
 }
-
-impl App {
-    pub fn random_mutate(&mut self) {
-        for cell in self.cells.iter_mut() {
-            *cell = rand::thread_rng().gen()
-        }
-    }
-}
-
 impl Component for App {
     type Message = Msg;
     type Properties = ();
 
-    fn create(ctx: &Context<Self>) -> Self {
-        let callback = ctx.link().callback(|_| Msg::Random);
-        let interval = Interval::new(200, move || callback.emit(()));
-
-        let (cells_width, cells_height) = (53, 40);
-
+    fn view(&self, ctx: &yew::Context<Self>) -> yew::Html {
+        // let result = grid_to_string(self.tiles.as_slice());
+        let result = grid_to_string(&mandelbrot(
+            128,
+            128,
+            self.min_real..self.max_real,
+            self.min_imag..self.max_imag,
+            2000,
+        ));
+        html!(
+        <>
+        <p>{result}</p>
+            <div class="game-buttons">
+                 <button class="game-button" onclick={ctx.link().callback(|_| Msg::Random)}>{ "[ Random ]" }</button>
+                <button class="game-button" onclick={ctx.link().callback(|_| Msg::ZoomIn)}>{ "[ Zoom in ]" }</button>
+                <button class="game-button" onclick={ctx.link().callback(|_| Msg::ZoomOut)}>{ "[ Zoom out ]" }</button>
+                <button class="game-button" onclick={ctx.link().callback(|_| Msg::Move(Dir::Up))}>{ "Stop" }</button>
+             </div>
+        </>
+        )
+    }
+    fn create(ctx: &yew::Context<Self>) -> Self {
         Self {
-            active: false,
-            cells: vec![true; cells_width * cells_height],
-            cells_width,
-            _interval: interval,
+            min_real: -2.0,
+            max_real: 1.0,
+            min_imag: -1.5,
+            max_imag: 1.5,
         }
     }
-
-    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
+    fn update(&mut self, ctx: &yew::Context<Self>, msg: Self::Message) -> bool {
         match msg {
-            Msg::Random => {
-                self.random_mutate();
-                log::info!("Random");
-                true
-            }
-            Msg::Zoom => {
-                self.active = true;
-                log::info!("Zoom");
-                false
-            }
-            Msg::Dezoom => true,
-            Msg::Move(_) => {
-                self.active = false;
-                log::info!("Stop");
-                false
-            }
-        }
-    }
-
-    fn view(&self, ctx: &Context<Self>) -> Html {
-        let cell_rows = self
-            .cells
-            .chunks(self.cells_width)
-            .map(|x: &[bool]| x.to_vec())
-            .collect::<Vec<Vec<bool>>>();
-        let render = dbg!(grid_to_string(cell_rows));
-
-        html! {
-            <div>
-                <section class="game-container">
-                    <header class="app-header">
-                        <h1 class="app-title">{ "Fractal Explorer" }</h1>
-                    </header>
-                    <section class="game-area">
-                        <div class="game-of-life">
-        {render}
-                        </div>
-                        <div class="game-buttons">
-                            <button class="game-button" onclick={ctx.link().callback(|_| Msg::Random)}>{ "[ Random ]" }</button>
-                            <button class="game-button" onclick={ctx.link().callback(|_| Msg::Zoom)}>{ "[ Zoom in ]" }</button>
-                            <button class="game-button" onclick={ctx.link().callback(|_| Msg::Dezoom)}>{ "[ Zoom out ]" }</button>
-                            <button class="game-button" onclick={ctx.link().callback(|_| Msg::Move(Dir::Up))}>{ "Stop" }</button>
-                        </div>
-                    </section>
-                </section>
-                <footer class="app-footer">
-                    <strong class="footer-text">
-                      { "Game of Life - a yew experiment " }
-                    </strong>
-                    <a href="https://github.com/yewstack/yew" target="_blank">{ "source" }</a>
-                </footer>
-            </div>
+            Msg::Random => true,
+            Msg::ZoomIn => true,
+            Msg::ZoomOut => true,
+            Msg::Move(x) => true,
         }
     }
 }
 
-fn wrap(coord: isize, range: isize) -> usize {
-    let result = if coord < 0 {
-        coord + range
-    } else if coord >= range {
-        coord - range
-    } else {
-        coord
-    };
-    result as usize
+impl App {
+    fn zoom(factor: f64) {}
 }
 
-fn grid_to_string(grid: Vec<Vec<bool>>) -> String {
+fn grid_to_string(grid: &[Vec<bool>]) -> String {
     let rows = grid.len();
     let columns = grid[0].len();
+
     let mut chunks = String::new();
     for row_start in (0..rows).step_by(4) {
         for col_start in (0..columns).step_by(2) {
-            let mut chunk = Vec::new();
-
             // Collect the sub-grid/chunk from grid
-            for r in row_start..std::cmp::min(row_start + 4, rows) {
-                let row = grid[r][col_start..std::cmp::min(col_start + 2, columns)].to_vec();
-                chunk.push(row);
-            }
-            let thing: [[bool; 2]; 4] = [
-                chunk[0].clone().try_into().unwrap(),
-                chunk[1].clone().try_into().unwrap(),
-                chunk[2].clone().try_into().unwrap(),
-                chunk[3].clone().try_into().unwrap(),
-            ];
 
-            chunks.push(grid_to_char(thing));
+            let chunk = grid
+                .iter()
+                .take(std::cmp::min(row_start + 4, rows))
+                .skip(row_start)
+                .fold(Vec::new(), |mut acc: Vec<[bool; 2]>, x| {
+                    acc.push(
+                        x[col_start..std::cmp::min(col_start + 2, columns)]
+                            .try_into()
+                            .unwrap(),
+                    );
+                    acc
+                });
+            let thing: [[bool; 2]; 4] = [chunk[0], chunk[1], chunk[2], chunk[3]];
+
+            chunks.push(braille_from_8dot_grid(thing));
         }
-        chunks.push('\n');
+        chunks.push_str("\n\r");
     }
     chunks
 }
 
-fn grid_to_char(grid: [[bool; 2]; 4]) -> char {
-    let mut braille_value: u8 = 0;
-    for row in 0..2 {
-        for col in 0..4 {
+fn braille_from_8dot_grid(grid: [[bool; 2]; 4]) -> char {
+    // Flatten the 2x4 grid into a single list of 8 booleans
+    let mut braille_value = 0;
+
+    // Map each grid position to its respective bit in the Braille encoding
+    for row in 0..4 {
+        for col in 0..2 {
             let bit_position = match (row, col) {
                 (0, 0) => 0, // Dot 1
                 (1, 0) => 1, // Dot 2
+                (2, 0) => 2, // Dot 3
                 (0, 1) => 3, // Dot 4
                 (1, 1) => 4, // Dot 5
-                (0, 2) => 2, // Dot 3
-                (1, 2) => 5, // Dot 6
-                (0, 3) => 6, // Dot 7
-                (1, 3) => 7, // Dot 8
+                (2, 1) => 5, // Dot 6
+                (3, 0) => 6, // Dot 7
+                (3, 1) => 7, // Dot 8
                 _ => unreachable!(),
             };
 
@@ -171,11 +130,42 @@ fn grid_to_char(grid: [[bool; 2]; 4]) -> char {
     let braille_unicode_base = 0x2800;
 
     // Add the computed value to the base to get the Unicode character
-    std::char::from_u32(braille_unicode_base + braille_value as u32).unwrap_or('?')
+    std::char::from_u32(braille_unicode_base + braille_value).unwrap_or('?')
 }
 
+fn mandelbrot(
+    width: u32,
+    height: u32,
+    real_range: Range<f64>,
+    imag_range: Range<f64>,
+    max_iters: usize,
+) -> Vec<Vec<bool>> {
+    let real_step = (real_range.end - real_range.start) / width as f64;
+    let imag_step = (imag_range.end - imag_range.start) / height as f64;
+
+    (0..height)
+        .map(|j| {
+            (0..width)
+                .map(move |i| {
+                    let c = Complex64::new(
+                        real_range.start + i as f64 * real_step, // Real part of c
+                        imag_range.start + j as f64 * imag_step, // Imaginary part of c
+                    );
+
+                    successors(Some(Complex64::ZERO), |z| {
+                        if z.norm_sqr() > 4.0 {
+                            None
+                        } else {
+                            Some(z * z + c)
+                        }
+                    })
+                    .nth(max_iters)
+                    .is_some()
+                })
+                .collect()
+        })
+        .collect()
+}
 fn main() {
-    wasm_logger::init(wasm_logger::Config::default());
-    log::trace!("Initializing yew...");
     yew::Renderer::<App>::new().render();
 }

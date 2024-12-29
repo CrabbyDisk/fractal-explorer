@@ -11,3 +11,5 @@ rand = "0.8"
 wasm-logger = "0.2"
 gloo = {version = "0.11" }
 yew = {version = "0.21.0", features = ["csr"]}
+num-complex = "0.4.6"
+rayon = "1.10.0"

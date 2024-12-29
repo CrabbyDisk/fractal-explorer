@@ -1,6 +1,8 @@
 * {
   color: #07eb0b;
   border: none;
+  background-color: black;
+  white-space: pre;
 }
 html,
 body {
@@ -15,7 +17,7 @@ body {
     Helvetica,
     Arial,
     sans-serif;
-  line-height: 1.4em;
+  line-height: 1.25em;
   color: #4d4d4d;
   min-width: 230px;
   max-width: 1000px;
@@ -24,11 +26,9 @@ body {
   -moz-font-smoothing: antialiased;
   font-smoothing: antialiased;
   font-weight: 300;
-  background-color: #000000;
 }
 
 .app-header {
-  background-color: #000;
   height: 130px;
   color: aliceblue;
 }
