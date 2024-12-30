@@ -10,6 +10,7 @@ yew = {version = "0.21.0", features = ["csr"]}
 num-complex = "0.4.6"
 rayon = "1.10.0"
 wgpu = "23.0.1"
+wasm-bindgen = "0.2.99"
 
 [profile.release]
 debug=true

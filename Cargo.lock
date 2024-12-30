@@ -300,6 +300,7 @@ dependencies = [
  "num-complex",
  "rand",
  "rayon",
+ "wasm-bindgen",
  "wgpu",
  "yew",
 ]
