@@ -1,10 +1,4 @@
 {
   "version": 2,
-  "outputDirectory": "dist",
-  "builds": [
-    {
-      "src": "dist/*",
-      "use": "@vercel/static"
-    }
-  ]
+  "outputDirectory": "dist"
 }
