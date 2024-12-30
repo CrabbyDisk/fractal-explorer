@@ -1,6 +1,6 @@
 @group(0)
 @binding(0)
-var<storage, read_write> v_indices: array<array<bool>>; // this is used as both input and output for convenience
+var<storage, write> output: array<array<bool>>; // this is used as both input and output for convenience
 
 // The Collatz Conjecture states that for any integer n:
 // If n is even, n = n/2
@@ -29,6 +29,10 @@ fn collatz_iterations(n_base: u32) -> u32{
         i = i + 1u;
     }
     return i;
+}
+
+fn mandelbrot(re: f32, im: f32) -> bool {
+    
 }
 
 @compute
