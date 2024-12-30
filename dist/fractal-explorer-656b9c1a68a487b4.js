@@ -231,11 +231,11 @@ function debugString(val) {
     return className;
 }
 function __wbg_adapter_20(arg0, arg1, arg2) {
-    wasm.closure124_externref_shim(arg0, arg1, arg2);
+    wasm.closure132_externref_shim(arg0, arg1, arg2);
 }
 
 function __wbg_adapter_23(arg0, arg1, arg2) {
-    wasm.closure202_externref_shim(arg0, arg1, arg2);
+    wasm.closure211_externref_shim(arg0, arg1, arg2);
 }
 
 async function __wbg_load(module, imports) {
@@ -558,12 +558,12 @@ function __wbg_get_imports() {
         const ret = false;
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper1264 = function(arg0, arg1, arg2) {
-        const ret = makeClosure(arg0, arg1, 125, __wbg_adapter_20);
+    imports.wbg.__wbindgen_closure_wrapper1679 = function(arg0, arg1, arg2) {
+        const ret = makeClosure(arg0, arg1, 133, __wbg_adapter_20);
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper3095 = function(arg0, arg1, arg2) {
-        const ret = makeMutClosure(arg0, arg1, 203, __wbg_adapter_23);
+    imports.wbg.__wbindgen_closure_wrapper3114 = function(arg0, arg1, arg2) {
+        const ret = makeMutClosure(arg0, arg1, 212, __wbg_adapter_23);
         return ret;
     };
     imports.wbg.__wbindgen_debug_string = function(arg0, arg1) {
@@ -655,7 +655,7 @@ async function __wbg_init(module_or_path) {
     }
 
     if (typeof module_or_path === 'undefined') {
-        module_or_path = new URL('braille_art_bg.wasm', import.meta.url);
+        module_or_path = new URL('fractal-explorer_bg.wasm', import.meta.url);
     }
     const imports = __wbg_get_imports();
 
