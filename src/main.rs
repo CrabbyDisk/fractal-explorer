@@ -1,11 +1,16 @@
+mod gpu;
+use crate::gpu::Uniform;
+
 use std::array;
 use std::ops::Range;
-use std::{f64, iter::successors};
+use std::{f32, iter::successors};
 
-use num_complex::Complex64;
-use rayon::iter::{ParallelBridge, ParallelIterator};
+use console_error_panic_hook::set_once;
+use gpu::WGPUContext;
+use num_complex::Complex32;
 use wgpu::util::DeviceExt;
-use yew::{html, Component};
+use yew::platform::spawn_local;
+use yew::{html, Callback, Component};
 
 enum Dir {
     Up,
@@ -18,20 +23,22 @@ enum Msg {
     ZoomOut,
     ZoomIn,
     Move(Dir),
+    FinishCreate(WGPUContext),
 }
 
 const WIDTH: usize = 128;
 const HEIGHT: usize = 128;
 
-const MIN_REAL: f64 = -2.0;
-const MAX_REAL: f64 = 1.0;
-const MIN_IMAG: f64 = -1.5;
-const MAX_IMAG: f64 = 1.5;
+const MIN_REAL: f32 = -2.0;
+const MAX_REAL: f32 = 1.0;
+const MIN_IMAG: f32 = -1.5;
+const MAX_IMAG: f32 = 1.5;
 const ITERATIONS: usize = 1000;
 
 struct App {
-    center: Complex64,
+    center: Complex32,
     zoom_factor: i32,
+    wgpu_context: Option<WGPUContext>,
 }
 impl Component for App {
     type Message = Msg;
@@ -39,9 +46,16 @@ impl Component for App {
 
     fn view(&self, ctx: &yew::Context<Self>) -> yew::Html {
         // let result = grid_to_string(self.tiles.as_slice());
-
         let zoomed = get_zoomed(self.center, self.zoom_factor);
-        let result = grid_to_string(mandelbrot(zoomed.0, zoomed.1, ITERATIONS));
+        let result = if self.wgpu_context.is_some() {
+            grid_to_string(self.wgpu_context.as_ref().unwrap().render(Uniform {
+                bounds: zoomed,
+                iterations: ITERATIONS as u32,
+            }))
+        } else {
+            "".to_owned()
+        };
+
         html!(
         <>
         <h1> {"fractal-explorer"}</h1>
@@ -59,13 +73,25 @@ impl Component for App {
         )
     }
     fn create(ctx: &yew::Context<Self>) -> Self {
+        let wgpu_context = ctx.link().callback(Msg::FinishCreate);
+
+        yew::platform::spawn_local(async move {
+            let context = WGPUContext::new().await;
+            wgpu_context.emit(context);
+        });
+
         Self {
             zoom_factor: 0,
-            center: Complex64::new((MIN_REAL + MAX_REAL) / 2.0, (MIN_IMAG + MAX_IMAG) / 2.0),
+            center: Complex32::new((MIN_REAL + MAX_REAL) / 2.0, (MIN_IMAG + MAX_IMAG) / 2.0),
+            wgpu_context: None,
         }
     }
     fn update(&mut self, ctx: &yew::Context<Self>, msg: Self::Message) -> bool {
         match msg {
+            Msg::FinishCreate(x) => {
+                self.wgpu_context = Some(x);
+                true
+            }
             Msg::Random => true,
             Msg::ZoomIn => {
                 self.zoom_factor += 1;
@@ -85,7 +111,7 @@ impl Component for App {
 
 impl App {
     fn r#move(&mut self, dir: Dir) {
-        let scaled_move = 2.0_f64.powi(-self.zoom_factor);
+        let scaled_move = 2.0_f32.powi(-self.zoom_factor);
         match dir {
             Dir::Up => {
                 self.center.im -= scaled_move;
@@ -164,21 +190,21 @@ fn braille_from_8dot_grid(grid: [[bool; 2]; 4]) -> char {
 }
 
 fn mandelbrot(
-    real_range: Range<f64>,
-    imag_range: Range<f64>,
+    real_range: Range<f32>,
+    imag_range: Range<f32>,
     max_iters: usize,
 ) -> [[bool; WIDTH]; HEIGHT] {
-    let real_step = (real_range.end - real_range.start) / WIDTH as f64;
-    let imag_step = (imag_range.end - imag_range.start) / HEIGHT as f64;
+    let real_step = (real_range.end - real_range.start) / WIDTH as f32;
+    let imag_step = (imag_range.end - imag_range.start) / HEIGHT as f32;
 
     array::from_fn(|j| {
         array::from_fn(move |i| {
-            let c = Complex64::new(
-                real_range.start + i as f64 * real_step, // Real part of c
-                imag_range.start + j as f64 * imag_step, // Imaginary part of c
+            let c = Complex32::new(
+                real_range.start + i as f32 * real_step, // Real part of c
+                imag_range.start + j as f32 * imag_step, // Imaginary part of c
             );
 
-            successors(Some(Complex64::ZERO), |z| {
+            successors(Some(c), |z| {
                 if z.norm_sqr() > 4.0 {
                     None
                 } else {
@@ -190,61 +216,19 @@ fn mandelbrot(
         })
     })
 }
-/* async fn gpu_mandelbrot(
-    real_range: Range<f64>,
-    imag_range: Range<f64>,
-    max_iters: usize,
-) -> [[bool; WIDTH]; HEIGHT] {
-    let instance = wgpu::Instance::default();
-    let adapter = instance
-        .request_adapter(&wgpu::RequestAdapterOptions::default())
-        .await
-        .unwrap();
 
-    // `request_device` instantiates the feature specific connection to the GPU, defining some parameters,
-    //  `features` being the available features.
-    let (device, queue) = adapter
-        .request_device(
-            &wgpu::DeviceDescriptor {
-                label: None,
-                required_features: wgpu::Features::empty(),
-                required_limits: wgpu::Limits::downlevel_defaults(),
-                memory_hints: wgpu::MemoryHints::MemoryUsage,
-            },
-            None,
-        )
-        .await
-        .unwrap();
-    let cs_module = device.create_shader_module(wgpu::include_wgsl!("mandelbrot.wgsl"));
-
-    let size = size_of::<[[bool; WIDTH]; HEIGHT]>() as wgpu::BufferAddress;
-
-    let staging_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: None,
-        size,
-        usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false,
-    });
-  let storage_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("Storage Buffer"),
-        size,
-        usage: wgpu::BufferUsages::STORAGE
-            | wgpu::BufferUsages::COPY_DST
-            | wgpu::BufferUsages::COPY_SRC,
-        mapped_at_creation: false,
-    });
-
-}
- */
-fn get_zoomed(center: Complex64, zoom_factor: i32) -> (Range<f64>, Range<f64>) {
-    let calc_factor = 2_f64.powi(zoom_factor);
+fn get_zoomed(center: Complex32, zoom_factor: i32) -> [f32; 4] {
+    let calc_factor = 2_f32.powi(zoom_factor);
     let new_real_width = (MAX_REAL - MIN_REAL) / calc_factor;
     let new_imag_height = (MAX_IMAG - MIN_IMAG) / calc_factor;
-    (
-        center.re - new_real_width / 2.0..center.re + new_real_width / 2.0,
-        center.im - new_imag_height / 2.0..center.im + new_imag_height / 2.0,
-    )
+    [
+        center.re - new_real_width / 2.0,
+        center.re + new_real_width / 2.0,
+        center.im - new_imag_height / 2.0,
+        center.im + new_imag_height / 2.0,
+    ]
 }
 fn main() {
+    set_once();
     yew::Renderer::<App>::new().render();
 }

@@ -1,42 +1,42 @@
+struct Uniform {
+    bounds: vec4<f32>,
+    max_iterations: u32,
+}
+
 @group(0)
 @binding(0)
-var<storage, write> output: array<array<bool>>; // this is used as both input and output for convenience
+var texture: texture_storage_2d<r32uint, write>;
 
-// The Collatz Conjecture states that for any integer n:
-// If n is even, n = n/2
-// If n is odd, n = 3n+1
-// And repeat this process for each new n, you will always eventually reach 1.
-// Though the conjecture has not been proven, no counterexample has ever been found.
-// This function returns how many times this recurrence needs to be applied to reach 1.
-fn collatz_iterations(n_base: u32) -> u32{
-    var n: u32 = n_base;
-    var i: u32 = 0u;
-    loop {
-        if (n <= 1u) {
-            break;
-        }
-        if (n % 2u == 0u) {
-            n = n / 2u;
-        }
-        else {
-            // Overflow? (i.e. 3*n + 1 > 0xffffffffu?)
-            if (n >= 1431655765u) {   // 0x55555555u
-                return 4294967295u;   // 0xffffffffu
-            }
-
-            n = 3u * n + 1u;
-        }
-        i = i + 1u;
-    }
-    return i;
-}
-
-fn mandelbrot(re: f32, im: f32) -> bool {
-    
-}
+@group(0)
+@binding(1)
+var<uniform> args: Uniform;
 
 @compute
-@workgroup_size(1)
-fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
-    v_indices[global_id.x] = collatz_iterations(v_indices[global_id.x]);
+@workgroup_size(8, 8)
+fn main(@builtin(global_invocation_id) id: vec3<u32>) {
+    var bounds = args.bounds;
+    var max_iterations = args.max_iterations;
+
+    var final_iteration = max_iterations;
+    var real_step = (bounds.x - bounds.y) / f32(textureDimensions(texture).x);
+    var imag_step = (bounds.z - bounds.w) / f32(textureDimensions(texture).y);
+
+    var c = vec2(
+        // Translated to put everything nicely in frame.
+        bounds.x + (f32(id.x) * real_step),
+        bounds.z + (f32(id.y) * imag_step),
+    );
+
+    var current_z = c;
+    var next_z: vec2<f32>;
+    for (var i = 0u; i < max_iterations; i++) {
+        next_z.x = (current_z.x * current_z.x - current_z.y * current_z.y) + c.x;
+        next_z.y = (2.0 * current_z.x * current_z.y) + c.y;
+        current_z = next_z;
+        if length(current_z) > 4.0 {
+            final_iteration = i;
+            break;
+        }
+    }
+    textureStore(texture, vec2(i32(id.x), i32(id.y)), final_iteration);
 }
