@@ -14,7 +14,6 @@ enum Dir {
     Right,
 }
 enum Msg {
-    Random,
     ZoomOut,
     ZoomIn,
     Move(Dir),
@@ -47,7 +46,6 @@ impl Component for App {
         <h1> {"fractal-explorer"}</h1>
         <p>{result}</p>
             <div class="game-buttons">
-                 <button class="game-button" onclick={ctx.link().callback(|_| Msg::Random)}>{ "[ Random ]" }</button>
                 <button class="game-button" onclick={ctx.link().callback(|_| Msg::ZoomIn)}>{ "[ Zoom in ]" }</button>
                 <button class="game-button" onclick={ctx.link().callback(|_| Msg::ZoomOut)}>{ "[ Zoom out ]" }</button>
                 <button class="game-button" onclick={ctx.link().callback(|_| Msg::Move(Dir::Up))}>{ "[ Move up ]" }</button>
@@ -66,7 +64,6 @@ impl Component for App {
     }
     fn update(&mut self, ctx: &yew::Context<Self>, msg: Self::Message) -> bool {
         match msg {
-            Msg::Random => true,
             Msg::ZoomIn => {
                 self.zoom_factor += 1;
                 true
