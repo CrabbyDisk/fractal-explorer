@@ -74,6 +74,21 @@ impl Component for App {
     fn create(ctx: &yew::Context<Self>) -> Self {
         let window = window().unwrap();
         let link = ctx.link().clone();
+        window.add_event_listener_with_callback(
+            "keypress",
+            Closure::wrap(Box::new(move |e: KeyboardEvent| {
+                e.prevent_default();
+                match e.key().to_lowercase().as_str() {
+                    "h" | "arrowleft" | "a" => link.send_message(Msg::Move(Dir::Left)),
+                    "j" | "arrowdown" | "s" => link.send_message(Msg::Move(Dir::Down)),
+                    "k" | "arrowup" | "w" => link.send_message(Msg::Move(Dir::Up)),
+                    "l" | "arrowright" | "d" => link.send_message(Msg::Move(Dir::Right)),
+                    "=" | "x" | "e" => link.send_message(Msg::ZoomIn),
+                    "-" | "z" | "q" => link.send_message(Msg::ZoomOut),
+                    _ => {}
+                }
+            })),
+        );
         Self {
             zoom_factor: 0,
             center: Complex64::new((MIN_REAL + MAX_REAL) / 2.0, (MIN_IMAG + MAX_IMAG) / 2.0),
